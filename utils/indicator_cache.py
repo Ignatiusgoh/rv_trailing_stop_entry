@@ -6,18 +6,13 @@ class CandleCache:
     def __init__(self, max_candles: int = 200, volume_period: int = 12, historical_data: list = None):
         self.candles = deque(maxlen=max_candles)
         self.volume_period = volume_period
-        # self.rsi_values = deque(maxlen=10)  # Store last 10 RSI values
+
         
         # If historical data is passed, add it to the candles deque
         if historical_data:
             for candle in historical_data:
                 if candle['close_time'] < int(time.time() * 1000):
                     self.add_candle(candle)
-                    # Calculate and store initial RSI values
-                    if len(self.candles) >= 15:  # Minimum needed for RSI
-                        rsi = self.calculate_rsi()
-                        if rsi is not None:
-                            self.rsi_values.append(rsi)
 
     def fetch_historical_data(self, symbol: str, interval: str, limit: int = 100):
         """ Fetch historical candlestick data from an API (e.g., Binance). """
