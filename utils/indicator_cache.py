@@ -1,6 +1,7 @@
 import numpy as np
 from collections import deque
 import requests, time 
+from datetime import datetime, timezone, timedelta
 
 class CandleCache:
     def __init__(self, max_candles: int = 200, volume_period: int = 12, historical_data: list = None):
@@ -100,6 +101,18 @@ class CandleCache:
         return ema
 
 
+    def is_in_sgt_night(timestamp_str: str):
+
+        SGT = timezone(timedelta(hours=8))
+        # 1. parse UTC timestamp
+        dt_utc = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+
+        # 2. convert to SGT
+        dt_sgt = dt_utc.astimezone(SGT)
+
+        # 3. check if time is between 22:00–06:00
+        hour = dt_sgt.hour
+        return (hour < 22) or (hour >= 6)
 
 
 
