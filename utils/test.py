@@ -18,4 +18,7 @@ data = {
     "trailing_price": 110,
     "next_stoploss_price": 120
 }
-log_into_supabase(data, supabase_url=supabase_url, api_key=api_key, jwt=jwt)
+try:
+    log_into_supabase(data, supabase_url=supabase_url, api_key=api_key, jwt=jwt)
+except Exception as e:
+    print(f"Error: {e}")
