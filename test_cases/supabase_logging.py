@@ -1,5 +1,5 @@
-from utils.supabase_client import log_into_supabase
-from utils.indicator_cache import CandleCache
+from rv_trailing_stop_entry.utils.supabase_client import log_into_supabase
+from rv_trailing_stop_entry.utils.indicator_cache import CandleCache
 import os 
 from dotenv import load_dotenv
 
