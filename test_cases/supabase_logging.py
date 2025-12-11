@@ -1,5 +1,6 @@
-from rv_trailing_stop_entry.utils.supabase_client import log_into_supabase
-from rv_trailing_stop_entry.utils.indicator_cache import CandleCache
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.supabase_client import log_into_supabase
 import os 
 from dotenv import load_dotenv
 
