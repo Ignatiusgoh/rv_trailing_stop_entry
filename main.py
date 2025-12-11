@@ -19,7 +19,7 @@ supbase_jwt = os.getenv("SUPABASE_JWT")
 # strategy = int(os.getenv("STRATEGY_ENV"))
 
 symbol = "SOLUSDT"
-interval = "30m"
+interval = "1m"
 
 risk_amount = 10
 fee = 0.1
