@@ -79,7 +79,7 @@ class CandleCache:
     def calculate_ema(self, period: int = 9):
         """ Calculate the Exponential Moving Average (EMA) using pandas ewm(span=period) method. """
         # Get enough closes to calculate EMA properly (need at least period candles)
-        closes = self.get_last_n_closes(200)
+        closes = self.get_last_n_closes(50)
         if closes is None or len(closes) < period:
             return None  # Not enough data yet
 
