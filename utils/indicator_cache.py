@@ -6,7 +6,7 @@ class CandleCache:
     def __init__(self, max_candles: int = 200, volume_period: int = 12, historical_data: list = None):
         self.candles = deque(maxlen=max_candles)
         self.volume_period = volume_period
-        self.rsi_values = deque(maxlen=10)  # Store last 10 RSI values
+        # self.rsi_values = deque(maxlen=10)  # Store last 10 RSI values
         
         # If historical data is passed, add it to the candles deque
         if historical_data:
