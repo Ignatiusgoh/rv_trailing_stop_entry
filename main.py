@@ -19,324 +19,236 @@ supbase_jwt = os.getenv("SUPABASE_JWT")
 # strategy = int(os.getenv("STRATEGY_ENV"))
 
 symbol = "SOLUSDT"
-interval = "5m"
+interval = "30m"
 
-# if strategy == 1: 
-#     risk_amount = 15
-#     sl_percentage = 0.5
-#     fee = 0.1
-#     portfolio_threshold = 20
-#     rsi_lower = 30
-#     rsi_upper = 70
-#     sma_period = 30
-#     bb_std_dev = 2
-#     breakeven_buffer = 0.03
-#     rsi_period = 7
-#     max_concurrent_trades = 3
-# else: 
-#     risk_amount = 2
-#     sl_percentage = 0.5
-#     fee = 0.1
-#     portfolio_threshold = 20
-#     rsi_lower = 30
-#     rsi_upper = 70
-#     sma_period = 30
-#     bb_std_dev = 2
-#     breakeven_buffer = 0.03
-#     rsi_period = 7
-#     max_concurrent_trades = 3
-
-risk_amount = 15
-sl_percentage = 0.5
+risk_amount = 10
 fee = 0.1
 portfolio_threshold = 20
-rsi_lower = 30
-rsi_upper = 70
-sma_period = 30
-bb_std_dev = 2
-breakeven_buffer = 0.03
-rsi_period = 7
-max_concurrent_trades = 3
+rv_period = 2
+ema_period = 9
+rv_threshold = 2.8
+trailing_percentage = 0.7
 
-usdt_entry_size = risk_amount / ((sl_percentage + fee) / 100)
+
+# usdt_entry_size = risk_amount / ((sl_percentage + fee) / 100)
 trade = execute.BinanceFuturesTrader()
 
 async def main():
     init_logger()
     cache = indicator.CandleCache()
-    historical_data = cache.fetch_historical_data(symbol=symbol, interval=interval, limit=150)
+    historical_data = cache.fetch_historical_data(symbol=symbol, interval=interval, limit=200)
     cache = indicator.CandleCache(historical_data=historical_data)
     
     async for candle in candle_stream(symbol, interval):   # ← stays connected
 
+        #### to discuss how to proceed with lei (we dont need this anymore because it is always going to be one trade at a time) ####
         group_id = get_latest_group_id(supabase_url=supabase_url, api_key=supabase_api_key, jwt=supbase_jwt)
         group_id += 1    
-        
+        #########################################################
+
         cache.add_candle(candle)
-        bb = cache.calculate_bollinger_bands(period = sma_period, num_std_dev = bb_std_dev)
-        rsi = cache.calculate_rsi(period = rsi_period)
 
-        if bb is not None:
-            logging.info(f"BB Upper: {bb['upper']} BB Lower: {bb['lower']} SMA: {bb['sma']}")
+        rv = cache.calculate_relative_volume(period = rv_period)
+        ema = cache.calculate_ema(period = ema_period)
+
+        if rv is not None:
+            logging.info(f"RV: {rv}")
         else:
-            logging.info("BB: None")
-        
-        if rsi is not None: 
-            logging.info(f"RSI: {rsi}")
-        else: 
-            logging.info("RSI: None")
-        
-        percentage_at_risk = binance.percentage_at_risk(risk_amount)
-        logging.info(f"Portfolio risk: {percentage_at_risk}")
+            logging.info("RV: None")
 
-        recent_trades = get_latest_trades(supabase_url=supabase_url, api_key=supabase_api_key, jwt=supbase_jwt)
-        order_count = binance.get_total_open_order()
+        if ema is not None:
+            logging.info(f"EMA: {ema}")
+        else:
+            logging.info("EMA: None")
+
         
-        #######
-        # Checking if there are more than 10 open orders
-        #######
-        if order_count >= 10: 
+        if binance.get_total_open_order() > 0:
+            logging.info("There is an open order, not looking for entry")
             continue
+
+        # if percentage_at_risk < portfolio_threshold: 
+            # logging.info(f"Portfolio risk: {percentage_at_risk} percent lower than threshold: {portfolio_threshold}, looking for entry")
         
-        #######
-        # Cooldown after loss 
-        # Ensure no trades made within the next 5 mins after a loss 
-        #######
+        last_close = cache.candles[-1]['close']
+        last_open = cache.candles[-1]['open']
+        last_high = cache.candles[-1]['high']
+        last_low = cache.candles[-1]['low']
+
+        strategy_condition_long = (
+            (rv > rv_threshold and last_close > ema and last_open < ema)
+        )
+        strategy_condition_short = (
+            (rv > rv_threshold and last_close < ema and last_open > ema)
+        )
+
+        if strategy_condition_long:                
+            logging.info(f"Relative volume > {rv_threshold}, close price > {ema}, open price < {ema} ... Entering LONG")
+            logging.info(f"Close price: {last_close}")
+            logging.info(f"EMA: {ema}")
+            logging.info(f"Open price: {last_open}")
+            logging.info(f"Low price (stoploss price): {last_low}")
+            
+            stoploss_percentage = (last_close - last_low)/last_close * 100
+            usdt_entry_size = risk_amount / ((stoploss_percentage + fee) / 100)
+            logging.info(f"Stoploss percentage: {stoploss_percentage}%")
+            logging.info(f"Entry size: {usdt_entry_size}")
+
+            ###### ENTERING MARKET IN ORDER ######
+            try:
+                market_in = trade.place_market_order(symbol=symbol, side = "BUY", quantity=usdt_entry_size)
+                sleep(5)
+                logging.info(market_in)
+                market_in_order_id = market_in['orderId']
+
+            except Exception as e:
+                logging.error(f"Something went wrong executing MARKET IN ORDER, error: {e}")
+                return e
+
+            actual_entry_price = binance.entry_price(market_in_order_id)
+            logging.info(f"Actual entry price: {actual_entry_price}")
+
+            trailing_value = (actual_entry_price - last_low) * trailing_percentage
+            logging.info(f"Trailing value: {trailing_value}")
+
+            trailing_price = actual_entry_price + trailing_value
+            logging.info(f"Stoploss will be shifted when price is at {trailing_price}")   
+
+            next_stoploss_price = last_low + trailing_value   
+            logging.info(f"Next stoploss price: {next_stoploss_price}")
+                            
+            data = {
+                "group_id": group_id,
+                "order_id": market_in_order_id,
+                "type": "MO",
+                "direction": "LONG",
+                "current_stop_loss": last_low,
+                "trailing_value": trailing_value,
+                "trailing_price": trailing_price,
+                "next_stoploss_price": next_stoploss_price
+            }
+
+            try:
+                log_into_supabase(data, supabase_url=supabase_url, api_key=supabase_api_key, jwt=supbase_jwt)
+                logging.info("MARKET IN Trade logged to Supabase")
+            
+            except Exception as e:
+                logging.error(f"Failed to log MARKET IN trade to Supabase: {e}")
         
-        if recent_trades and recent_trades[0]['realized_pnl'] and recent_trades[0]['is_closed'] == True:
-            if recent_trades[0]['realized_pnl'] < 0:
-                last_exit_time = datetime.strptime(recent_trades[0]['exit_time'], "%Y-%m-%dT%H:%M:%S.%f")
-                now = datetime.utcnow()
-                difference_seconds = (now - last_exit_time).total_seconds()
-                if difference_seconds < 300: 
-                    continue
+            ###### ENTERING STOP LOSS ORDER ######
+            try: 
+                stoploss_order = trade.set_stop_loss(symbol=symbol, side="SELL", stop_price=last_low)
+                sleep(5)
+                logging.info(stoploss_order)
+                stoploss_order_id = stoploss_order['orderId']
 
-        #######
-        # Max concurrent trades
-        #######
-        if recent_trades: 
-            open_trades = sum(1 for trade in recent_trades if not trade['is_closed'])
-            if open_trades > max_concurrent_trades: 
-                continue
-  
+            except Exception as e:
+                logging.error(f"Something went wrong executing STOPLOSS ORDER, error: {e}")
+                return e
 
-        if percentage_at_risk < portfolio_threshold: 
+            data = {
+                "group_id": group_id,
+                "order_id": stoploss_order_id,
+                "type": "SL",
+                "direction": "LONG",
+                "current_stop_loss": last_low,
+                "trailing_value": trailing_value,
+                "trailing_price": trailing_price,
+                "next_stoploss_price": next_stoploss_price
+            }
+
+            try:
+                log_into_supabase(data, supabase_url=supabase_url, api_key=supabase_api_key, jwt=supbase_jwt)
+                logging.info("STOPLOSS Trade logged to Supabase")
             
-            logging.info(f"Portfolio risk: {percentage_at_risk} percent lower than threshold: {portfolio_threshold}, looking for entry")
-            last_close = cache.candles[-1]['close']
-            prev_close = cache.candles[-2]['close']
+            except Exception as e:
+                logging.error(f"Failed to log STOPLOSS trade to Supabase: {e}")
 
-            prev_rsi = cache.get_previous_rsi()  
-
-            sol_entry_size = round(usdt_entry_size / last_close,2)
-            sma = round(bb['sma'],2)
-
-            strategy_condition_long = (
-                (prev_close < bb['lower'] and last_close > bb['lower'] and 
-                rsi > rsi_lower and prev_rsi < rsi_lower and 
-                (rsi - prev_rsi) > 10)
-            )
-
-            strategy_condition_short = (
-                (prev_close > bb['upper'] and last_close < bb['upper'] and 
-                rsi < rsi_upper and prev_rsi > rsi_upper and 
-                (prev_rsi - rsi) > 10)
-            )
-
-            if strategy_condition_long:                
-                logging.info("Close price lower than lower bollinger band ... Entering LONG")
-                logging.info(f"Close price: {last_close}")
-                logging.info(f"Lower bollinger band: {bb['lower']}")
-
-                if (sma - last_close) < 0.5: ## this ensures that there is a reasonable gap between the SMA (TP) and the entry price, such that it will not enter if we are too close to TP 
-                    continue
-
-                try:
-                    logging.info(f"Quantity: {sol_entry_size}")
-                    market_in = trade.place_market_order(symbol=symbol, side = "BUY", quantity=sol_entry_size)
-                    sleep(1)
-                    logging.info(market_in)
-                    market_in_order_id = market_in['orderId']
-
-                except Exception as e:
-                    logging.error(f"Something went wrong executing MARKET IN ORDER, error: {e}")
-                    return e
-                                
-                data = {
-                    "group_id": group_id,
-                    "order_id": market_in_order_id,
-                    "type": "MO",
-                    "direction": "LONG",
-                    "breakeven_threshold": 0.00,
-                    "breakeven_price": 0.00
-                }
-
-                try:
-                    log_into_supabase(data, supabase_url=supabase_url, api_key=supabase_api_key, jwt=supbase_jwt)
-                    logging.info("MARKET IN Trade logged to Supabase")
-                
-                except Exception as e:
-                    logging.error(f"Failed to log MARKET IN trade to Supabase: {e}")
-                
-                sleep(2)
-                actual_entry_price = binance.entry_price(market_in_order_id)
-
-                stoploss_price = round(actual_entry_price - (actual_entry_price * sl_percentage / 100),2)
-                takeprofit_price = sma
-
-                try: 
-                    stoploss_order = trade.set_stop_loss(symbol=symbol, side="SELL", stop_price=stoploss_price, quantity=sol_entry_size)
-                    sleep(1)
-                    logging.info(stoploss_order)
-                    stoploss_order_id = stoploss_order['orderId']
-
-                except Exception as e:
-                    logging.error(f"Something went wrong executing STOPLOSS ORDER, error: {e}")
-                    return e
-                
-                try:
-                    takeprofit_order = trade.set_take_profit_limit(symbol=symbol, side="SELL", stop_price=takeprofit_price, price=takeprofit_price, quantity=sol_entry_size)
-                    sleep(1)
-                    logging.info(takeprofit_order)
-                    takeprofit_order_id = takeprofit_order['orderId']
-
-                except Exception as e:
-                    logging.error(f"Something went wrong executing TAKEPROFIT ORDER, error: {e}")
-                    return e
-                
-                # Breakeven calculations
-                breakeven_price = round(actual_entry_price + (actual_entry_price * fee / 100),2)
-                breakeven_indicator = breakeven_price + breakeven_buffer
-
-                # Log SL into DB 
-                data = {
-                    "group_id": group_id,
-                    "order_id": stoploss_order_id,
-                    "type": "SL",
-                    "direction": "LONG",
-                    "breakeven_threshold": breakeven_indicator,
-                    "breakeven_price": breakeven_price
-                }
-                try:
-                    log_into_supabase(data, supabase_url=supabase_url, api_key=supabase_api_key, jwt=supbase_jwt)
-                    logging.info("STOPLOSS Trade logged to Supabase")
-                
-                except Exception as e:
-                    logging.error(f"Failed to log STOPLOSS trade to Supabase: {e}")
-
-                # Log TP into DB 
-
-                data = {
-                    "group_id": group_id,
-                    "order_id": takeprofit_order_id,
-                    "type": "TP",
-                    "direction": "LONG",
-                    "breakeven_threshold": 0.00,
-                    "breakeven_price": 0.00
-                }
-                try:
-                    log_into_supabase(data, supabase_url=supabase_url, api_key=supabase_api_key, jwt=supbase_jwt)
-                    logging.info("TAKEPROFIT Trade logged to Supabase")
-                
-                except Exception as e:
-                    logging.error(f"Failed to log TAKEPROFIT trade to Supabase: {e}")
-
+        
+        elif strategy_condition_short:
+            logging.info(f"Relative volume > {rv_threshold}, close price < {ema}, open price > {ema} ... Entering SHORT")
+            logging.info(f"Close price: {last_close}")
+            logging.info(f"EMA: {ema}")
+            logging.info(f"Open price: {last_open}")
+            logging.info(f"High price (stoploss price): {last_high}")
             
-            elif strategy_condition_short:
+            stoploss_percentage = (last_high - last_close)/last_close * 100
+            usdt_entry_size = risk_amount / ((stoploss_percentage + fee) / 100)
+            logging.info(f"Stoploss percentage: {stoploss_percentage}%")
+            logging.info(f"Entry size: {usdt_entry_size}")
 
-                if (last_close - sma) < 0.5: ## this ensures that there is a reasonable gap between the SMA (TP) and the entry price, such that it will not enter if we are too close to TP 
-                    continue
+            ###### ENTERING MARKET IN ORDER ######
+            try:
+                market_in = trade.place_market_order(symbol=symbol, side = "SELL", quantity=usdt_entry_size)
+                sleep(5)
+                logging.info(market_in)
+                market_in_order_id = market_in['orderId']
 
-                logging.info("Close price higher than upper bollinger band ... Entering SHORT")
-                logging.info(f"Close price: {last_close}")
-                logging.info(f"Upper bollinger band: {bb['upper']}")
+            except Exception as e:
+                logging.error(f"Something went wrong executing MARKET IN ORDER, error: {e}")
+                return e
 
-                try: 
-                    logging.info(f"Quantity: {sol_entry_size}")
-                    market_in = trade.place_market_order(symbol=symbol, side = "SELL", quantity=sol_entry_size)
-                    market_in_order_id = market_in['orderId']
-                
-                except Exception as e:
-                    logging.error(f"Something went wrong executing MARKET IN ORDER, error: {e}")
-                    return e
-                
-                # Log into DB 
-                data = {
-                    "group_id": group_id,
-                    "order_id": market_in_order_id,
-                    "type": "MO",
-                    "direction": "SHORT",
-                    "breakeven_threshold": 0.00,
-                    "breakeven_price": 0.00
-                }
-                try:
-                    log_into_supabase(data, supabase_url=supabase_url, api_key=supabase_api_key, jwt=supbase_jwt)
-                    logging.info("MARKET IN Trade logged to Supabase")
-                
-                except Exception as e:
-                    logging.error(f"Failed to log MARKET IN trade to Supabase: {e}")
+            actual_entry_price = binance.entry_price(market_in_order_id)
+            logging.info(f"Actual entry price: {actual_entry_price}")
 
-                sleep(2)
-                actual_entry_price = binance.entry_price(market_in_order_id)
-                
-                stoploss_price = round(actual_entry_price + (actual_entry_price * sl_percentage / 100),2)
-                takeprofit_price = sma
+            trailing_value = (last_high - actual_entry_price) * trailing_percentage
+            logging.info(f"Trailing value: {trailing_value}")
+            
+            trailing_price = actual_entry_price - trailing_value
+            logging.info(f"Stoploss will be shifted when price is at {trailing_price}")  
 
-                try:
-                    stoploss_order = trade.set_stop_loss(symbol=symbol, side="BUY", stop_price=stoploss_price, quantity=sol_entry_size)
-                    stoploss_order_id = stoploss_order['orderId']
+            next_stoploss_price = last_high - trailing_value   
+            logging.info(f"Next stoploss price: {next_stoploss_price}")    
 
-                except Exception as e:
-                    logging.error(f"Something went wrong executing STOPLOSS ORDER, error: {e}")
-                    return e
-                
-                try:
-                    takeprofit_order = trade.set_take_profit_limit(symbol=symbol, side="BUY", stop_price=takeprofit_price, price=takeprofit_price, quantity=sol_entry_size)
-                    takeprofit_order_id = takeprofit_order['orderId']
-                
-                except Exception as e:
-                    logging.error(f"Something went wrong executing TAKEPROFIT ORDER, error: {e}")
-                    return e
-                
-                # Breakeven calculations
-                breakeven_price = round(actual_entry_price - (actual_entry_price * fee / 100),2)
-                breakeven_indicator = breakeven_price - breakeven_buffer 
+            data = {
+                "group_id": group_id,
+                "order_id": market_in_order_id,
+                "type": "MO",
+                "direction": "SHORT",
+                "current_stop_loss": last_high,
+                "trailing_value": trailing_value,
+                "trailing_price": trailing_price,
+                "next_stoploss_price": next_stoploss_price
+            }
 
-                # Log SL into DB 
-                # Log SL into DB 
-                data = {
-                    "group_id": group_id,
-                    "order_id": stoploss_order_id,
-                    "type": "SL",
-                    "direction": "SHORT",
-                    "breakeven_threshold": breakeven_indicator,
-                    "breakeven_price": breakeven_price
-                }
-                try:
-                    log_into_supabase(data, supabase_url=supabase_url, api_key=supabase_api_key, jwt=supbase_jwt)
-                    logging.info("STOPLOSS Trade logged to Supabase")
-                
-                except Exception as e:
-                    logging.error(f"Failed to log STOPLOSS trade to Supabase: {e}")
+            try:
+                log_into_supabase(data, supabase_url=supabase_url, api_key=supabase_api_key, jwt=supbase_jwt)
+                logging.info("MARKET IN Trade logged to Supabase")
+            
+            except Exception as e:
+                logging.error(f"Failed to log MARKET IN trade to Supabase: {e}")
+        
+            ###### ENTERING STOP LOSS ORDER ######
+            try: 
+                stoploss_order = trade.set_stop_loss(symbol=symbol, side="BUY", stop_price=last_high)
+                sleep(5)
+                logging.info(stoploss_order)
+                stoploss_order_id = stoploss_order['orderId']
 
-                # Log TP into DB 
+            except Exception as e:
+                logging.error(f"Something went wrong executing STOPLOSS ORDER, error: {e}")
+                return e
 
-                data = {
-                    "group_id": group_id,
-                    "order_id": takeprofit_order_id,
-                    "type": "TP",
-                    "direction": "SHORT",
-                    "breakeven_threshold": 0.00,
-                    "breakeven_price": 0.00
-                }
-                try:
-                    log_into_supabase(data, supabase_url=supabase_url, api_key=supabase_api_key, jwt=supbase_jwt)
-                    logging.info("TAKEPROFIT Trade logged to Supabase")
-                
-                except Exception as e:
-                    logging.error(f"Failed to log TAKEPROFIT trade to Supabase: {e}")
 
-            else: 
-                logging.info('Price within bands no entry')
+            data = {
+                "group_id": group_id,
+                "order_id": stoploss_order_id,
+                "type": "SL",
+                "direction": "SHORT",
+                "current_stop_loss": last_high,
+                "trailing_value": trailing_value,
+                "trailing_price": trailing_price,
+                "next_stoploss_price": next_stoploss_price
+            }
+
+            try:
+                log_into_supabase(data, supabase_url=supabase_url, api_key=supabase_api_key, jwt=supbase_jwt)
+                logging.info("STOPLOSS Trade logged to Supabase")
+            
+            except Exception as e:
+                logging.error(f"Failed to log STOPLOSS trade to Supabase: {e}")
+
+
+        else: 
+            logging.info('No entry conditions met')
         
 asyncio.run(main())

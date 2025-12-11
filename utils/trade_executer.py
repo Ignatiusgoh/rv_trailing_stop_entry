@@ -60,14 +60,13 @@ class BinanceFuturesTrader:
                     raise
                 time.sleep(self.retry_delay)
 
-    def set_stop_loss(self, symbol, side, stop_price, quantity):
+    def set_stop_loss(self, symbol, side, stop_price):
         params = {
             'symbol': symbol,
             'side': side,
             'type': 'STOP_MARKET',
             'stopPrice': stop_price,
-            'quantity': quantity,
-            'timeInForce': 'GTC'
+            'closePosition': 'true'
         }
 
         for attempt in range(1, self.max_retries + 1):
