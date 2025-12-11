@@ -6,10 +6,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# orders_table = "orders" if int(os.getenv("STRATEGY_ENV")) == 1 else "orders2"
-# order_groups_table = "order_groups" if int(os.getenv("STRATEGY_ENV")) == 1 else "order_groups2"
-# trades_table = "trades" if int(os.getenv("STRATEGY_ENV")) == 1 else "trades2"
-
 orders_table = 'orders'
 order_groups_table = 'order_groups'
 trades_table = 'trades'
