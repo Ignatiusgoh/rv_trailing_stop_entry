@@ -17,18 +17,26 @@ data = {
     "order_id": 1,
     "type": "MO",
     "direction": "LONG",
-    "current_stop_loss": 100,
-    "trailing_value": 10,
-    "trailing_price": 110,
-    "next_stoploss_price": 120
+    "current_stop_loss": 95,
+    "trailing_value": 5,
+    "trailing_price": 105,
+    "next_stoploss_price": 105
 }
 def test_log_into_supabase():
     try:
         response = log_into_supabase(data, supabase_url=supabase_url, api_key=api_key, jwt=jwt)
-        if response.status_code == 200:
-            print("Test passed")
+        # On success, log_into_supabase returns a list (from response.json())
+        # On error, it returns a dict with 'error' and 'status_code' keys
+        if isinstance(response, list) and len(response) > 0:
+            print("✅ Test passed - Data successfully logged to Supabase")
+            print(f"Response: {response}")
+        elif isinstance(response, dict) and 'error' in response:
+            print(f"❌ Test failed - Error: {response.get('error')}")
+            print(f"Status code: {response.get('status_code')}")
+        else:
+            print(f"⚠️ Unexpected response format: {response}")
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"❌ Error: {e}")
 
 
 if __name__ == "__main__":
