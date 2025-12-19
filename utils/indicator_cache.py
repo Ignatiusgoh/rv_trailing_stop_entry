@@ -112,7 +112,7 @@ class CandleCache:
 
         # 3. check if time is between 22:00–06:00
         hour = dt_sgt.hour
-        return hour
+        return (hour >= 22) or (hour < 6)
 
 
 
