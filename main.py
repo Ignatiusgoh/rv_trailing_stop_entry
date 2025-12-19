@@ -65,8 +65,10 @@ async def main():
         if binance.get_total_open_order() > 0:
             logging.info("There is an open order, not looking for entry")
             continue
-
-        if cache.is_in_sgt_night(cache.candles[-1]['timestamp']):
+        
+        logging.info(f"timestamp: {cache.candles[-1]['timestamp']}")
+        logging.info(f"hour: {cache.is_in_sgt_night(cache.candles[-1]['timestamp'])}")
+        if cache.is_in_sgt_night(cache.candles[-1]['timestamp']) < 22 or cache.is_in_sgt_night(cache.candles[-1]['timestamp']) >= 6:
             logging.info("Trading window is closed; only trading between 10pm to 6am SGT)")
             continue
 
