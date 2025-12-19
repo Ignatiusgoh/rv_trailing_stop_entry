@@ -101,7 +101,7 @@ class CandleCache:
         return ema
 
 
-    def is_in_sgt_night(self, timestamp_str: str):
+    def trading_window(self, timestamp_str: str):
 
         SGT = timezone(timedelta(hours=8))
         # 1. parse UTC timestamp

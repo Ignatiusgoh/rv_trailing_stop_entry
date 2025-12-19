@@ -66,7 +66,9 @@ async def main():
             logging.info("There is an open order, not looking for entry")
             continue
         
-        if cache.is_in_sgt_night(cache.candles[-1]['timestamp']):
+        if cache.trading_window(cache.candles[-1]['timestamp']):
+            logging.info("Trading window is open")
+        else: 
             logging.info("Trading window is closed; only trading between 10pm to 6am SGT)")
             continue
 
