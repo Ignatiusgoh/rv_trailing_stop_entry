@@ -94,8 +94,8 @@ async def main():
             logging.info(f"Open price: {last_open}")
             logging.info(f"Low price (stoploss price): {last_low}")
             
-            stoploss_percentage = (last_close - last_low)/last_close * 100
-            usdt_entry_size = risk_amount / ((stoploss_percentage + fee) / 100)
+            stoploss_percentage = round((last_close - last_low)/last_close * 100, 2)
+            usdt_entry_size = round(risk_amount / ((stoploss_percentage + fee) / 100), 2)
             logging.info(f"Stoploss percentage: {stoploss_percentage}%")
             logging.info(f"Entry size: {usdt_entry_size}")
 
@@ -177,8 +177,8 @@ async def main():
             logging.info(f"Open price: {last_open}")
             logging.info(f"High price (stoploss price): {last_high}")
             
-            stoploss_percentage = (last_high - last_close)/last_close * 100
-            usdt_entry_size = risk_amount / ((stoploss_percentage + fee) / 100)
+            stoploss_percentage = round(((last_high - last_close)/last_close * 100), 2)
+            usdt_entry_size = round(risk_amount / ((stoploss_percentage + fee) / 100),2)
             logging.info(f"Stoploss percentage: {stoploss_percentage}%")
             logging.info(f"Entry size: {usdt_entry_size}")
 
