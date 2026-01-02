@@ -78,6 +78,47 @@ def get_total_open_order():
             logging.warning(f"⚠️ Error fetching open orders: {e}. Retrying")
             time.sleep(0.1)
 
+def get_max_leverage(symbol="SOLUSDT"):
+    """
+    Get the maximum leverage available for a symbol.
+    
+    Args:
+        symbol (str): Trading pair symbol (default: "SOLUSDT")
+    
+    Returns:
+        int: Maximum leverage available for the symbol, or None if error
+    """
+    while True:
+        try:
+            # Get leverage brackets for the symbol
+            leverage_brackets = client.futures_leverage_bracket(symbol=symbol)
+            
+            if not leverage_brackets or len(leverage_brackets) == 0:
+                logging.warning(f"⚠️ No leverage brackets found for {symbol}")
+                return None
+            
+            # The leverage_brackets is a list, get the first element
+            bracket_data = leverage_brackets[0]
+            
+            # The brackets array contains leverage tiers, find the maximum initialLeverage
+            if 'brackets' in bracket_data and bracket_data['brackets']:
+                max_leverage = max(
+                    tier.get('initialLeverage', 0) 
+                    for tier in bracket_data['brackets']
+                )
+                return max_leverage if max_leverage > 0 else None
+            else:
+                logging.warning(f"⚠️ No brackets found in leverage data for {symbol}")
+                return None
+            
+        except requests.exceptions.RequestException as e:
+            logging.warning(f"⚠️ Error fetching leverage for {symbol}: {e}. Retrying")
+            time.sleep(0.1)
+        except Exception as e:
+            logging.error(f"❌ Unexpected error fetching leverage for {symbol}: {e}")
+            return None
+
 
 if __name__ == '__main__':
     print(get_usdt_balance())
+    print(f"Max leverage for SOLUSDT: {get_max_leverage('SOLUSDT')}")
