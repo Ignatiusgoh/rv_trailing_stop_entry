@@ -96,12 +96,15 @@ async def main():
             
             stoploss_percentage = round((last_close - last_low)/last_close * 100, 2)
             usdt_entry_size = round(risk_amount / ((stoploss_percentage + fee) / 100), 2)
+            sol_entry_size = round(usdt_entry_size / last_close, 2)
             logging.info(f"Stoploss percentage: {stoploss_percentage}%")
-            logging.info(f"Entry size: {usdt_entry_size}")
+            logging.info(f"Entry size: {usdt_entry_size} USDT")
+            logging.info(f"Entry size: {sol_entry_size} SOL")
+
 
             ###### ENTERING MARKET IN ORDER ######
             try:
-                market_in = trade.place_market_order(symbol=symbol, side = "BUY", quantity=usdt_entry_size)
+                market_in = trade.place_market_order(symbol=symbol, side = "BUY", quantity=sol_entry_size)
                 sleep(5)
                 logging.info(market_in)
                 market_in_order_id = market_in['orderId']
@@ -179,12 +182,14 @@ async def main():
             
             stoploss_percentage = round(((last_high - last_close)/last_close * 100), 2)
             usdt_entry_size = round(risk_amount / ((stoploss_percentage + fee) / 100),2)
+            sol_entry_size = round(usdt_entry_size / last_close, 2)
             logging.info(f"Stoploss percentage: {stoploss_percentage}%")
             logging.info(f"Entry size: {usdt_entry_size}")
+            logging.info(f"Entry size: {sol_entry_size} SOL")
 
             ###### ENTERING MARKET IN ORDER ######
             try:
-                market_in = trade.place_market_order(symbol=symbol, side = "SELL", quantity=usdt_entry_size)
+                market_in = trade.place_market_order(symbol=symbol, side = "SELL", quantity=sol_entry_size)
                 sleep(5)
                 logging.info(market_in)
                 market_in_order_id = market_in['orderId']
