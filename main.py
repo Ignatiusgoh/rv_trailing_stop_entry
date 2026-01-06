@@ -149,7 +149,7 @@ async def main():
                 sleep(5)
                 logging.info(f"Stop loss order response: {stoploss_order}")
                 # Algo Order API may return 'clientAlgoId' or 'orderId'
-                stoploss_order_id = stoploss_order.get('orderId') or stoploss_order.get('algoId')
+                stoploss_order_id = stoploss_order.get('algoId')
                 if not stoploss_order_id:
                     logging.error(f"❌ Stop loss order response missing orderId/clientAlgoId: {stoploss_order}")
                     raise Exception(f"Stop loss order failed: {stoploss_order}")
@@ -238,7 +238,7 @@ async def main():
                 sleep(5)
                 logging.info(f"Stop loss order response: {stoploss_order}")
                 # Algo Order API may return 'clientAlgoId' or 'orderId'
-                stoploss_order_id = stoploss_order.get('orderId') or stoploss_order.get('algoId')
+                stoploss_order_id = stoploss_order.get('algoId')
                 if not stoploss_order_id:
                     logging.error(f"❌ Stop loss order response missing orderId/clientAlgoId: {stoploss_order}")
                     raise Exception(f"Stop loss order failed: {stoploss_order}")
