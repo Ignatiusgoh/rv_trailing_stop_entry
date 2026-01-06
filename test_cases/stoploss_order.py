@@ -18,7 +18,10 @@ trade = BinanceFuturesTrader()
 try: 
     stoploss_order = trade.set_stop_loss(symbol="SOLUSDT", side="SELL", stop_price=120)
     print(stoploss_order)
-    stoploss_order_id = stoploss_order.get('orderId') or stoploss_order.get('algoId')
+    # Algo Order API returns 'algoId' or 'clientAlgoId', not 'orderId'
+    stoploss_order_id = stoploss_order.get('algoId') or stoploss_order.get('clientAlgoId') or stoploss_order.get('orderId')
+    print(f"Stop loss order ID: {stoploss_order_id}")
+    
     data = {
         "group_id": 0,
         "order_id": stoploss_order_id,
@@ -31,10 +34,10 @@ try:
     }
     try:
         log_into_supabase(data, supabase_url=supabase_url, api_key=supabase_api_key, jwt=supbase_jwt)
-        print.info("STOPLOSS Trade logged to Supabase")
+        print("✅ STOPLOSS Trade logged to Supabase")
 
     except Exception as e:
-        print.error(f"Failed to log STOPLOSS trade to Supabase: {e}")
+        print(f"❌ Failed to log STOPLOSS trade to Supabase: {e}")
 
 except Exception as e:
     print(f"Error: {e}")
