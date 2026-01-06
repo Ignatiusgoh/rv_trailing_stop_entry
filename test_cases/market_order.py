@@ -51,4 +51,4 @@ def close_all_positions():
         return None
 
 # Uncomment to test closing all positions
-close_all_positions()    
+# close_all_positions()    
