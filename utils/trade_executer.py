@@ -94,46 +94,45 @@ class BinanceFuturesTrader:
 
     def set_stop_loss(self, symbol, side, stop_price):
         """
-        Set a stop loss order using regular endpoint with closePosition.
-        Based on Binance API docs, STOP_MARKET with closePosition should work on regular endpoint.
+        Set a stop loss order using Binance Algo Order API.
+        For STOP_MARKET orders, algotype must be 'CONDITIONAL'.
         """
-        # Use closePosition instead of quantity - this closes the entire position
+        # First, get the current position size
+        try:
+            positions = self.get_open_positions()
+            position = next((p for p in positions if p['symbol'] == symbol), None)
+            
+            if not position:
+                raise Exception(f"No open position found for {symbol}. Cannot set stop loss.")
+            
+            position_amt = float(position.get('positionAmt', 0))
+            if position_amt == 0:
+                raise Exception(f"Position amount is 0 for {symbol}. Cannot set stop loss.")
+            
+            quantity = abs(position_amt)
+            logging.info(f"Setting stop loss for {symbol}: position={position_amt}, quantity={quantity}")
+            
+        except Exception as e:
+            logging.error(f"Error getting position for stop loss: {e}")
+            raise
+        
+        # Use Algo Order API with algotype='CONDITIONAL' for STOP_MARKET orders
         params = {
             'symbol': symbol,
             'side': side,
+            'positionSide': 'BOTH',
+            'algotype': 'CONDITIONAL',  # Required: 'CONDITIONAL' for STOP_MARKET orders
             'type': 'STOP_MARKET',
-            'stopPrice': str(stop_price),
-            'closePosition': 'true',  # Close entire position (no quantity needed)
-            'workingType': 'MARK_PRICE'  # Use mark price for stop trigger
+            'quantity': str(quantity),
+            'triggerPrice': str(stop_price),  # Use triggerPrice for conditional orders
+            'reduceOnly': 'true',
+            'workingType': 'MARK_PRICE'
         }
 
         for attempt in range(1, self.max_retries + 1):
             try:
-                # Try regular endpoint first with closePosition
-                self.res = self._post('/fapi/v1/order', params)
-                
-                # If we get -4120 (needs algo endpoint), that's strange but let's handle it
-                if 'code' in self.res and self.res.get('code') == -4120:
-                    logging.warning("Regular endpoint returned -4120. This shouldn't happen with closePosition.")
-                    logging.warning("Trying with quantity and reduceOnly as fallback...")
-                    # Fallback: get position and use quantity with reduceOnly
-                    try:
-                        positions = self.get_open_positions()
-                        position = next((p for p in positions if p['symbol'] == symbol), None)
-                        if position:
-                            quantity = abs(float(position.get('positionAmt', 0)))
-                            params_fallback = {
-                                'symbol': symbol,
-                                'side': side,
-                                'type': 'STOP_MARKET',
-                                'stopPrice': str(stop_price),
-                                'quantity': str(quantity),
-                                'reduceOnly': 'true',
-                                'workingType': 'MARK_PRICE'
-                            }
-                            self.res = self._post('/fapi/v1/order', params_fallback)
-                    except Exception as e:
-                        logging.error(f"Fallback also failed: {e}")
+                # Use Algo Order API endpoint
+                self.res = self._post('/fapi/v1/algoOrder', params)
                 
                 # Check for error response
                 if 'code' in self.res and self.res['code'] != 200:
