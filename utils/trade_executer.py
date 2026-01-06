@@ -76,22 +76,52 @@ class BinanceFuturesTrader:
                 time.sleep(self.retry_delay)
 
     def set_stop_loss(self, symbol, side, stop_price):
+        """
+        Set a stop loss order using Binance Algo Order API.
+        Note: STOP_MARKET orders with closePosition must use the Algo Order endpoint.
+        """
         params = {
             'symbol': symbol,
             'side': side,
+            'positionSide': 'BOTH',  # Use BOTH for one-way mode
             'type': 'STOP_MARKET',
-            'stopPrice': stop_price,
-            'closePosition': 'true'
+            'stopPrice': str(stop_price),
+            'closePosition': 'true',
+            'workingType': 'MARK_PRICE'  # Use mark price for stop trigger
         }
 
         for attempt in range(1, self.max_retries + 1):
             try:
-                self.res = self._post('/fapi/v1/order', params)
-                if 'orderId' in self.res:
-                    logging.info(f"Successfully executed STOPLOSS ORDER with ID: {self.res['orderId']}")
+                # Use Algo Order API endpoint for STOP_MARKET orders
+                self.res = self._post('/fapi/v1/algo/order', params)
+                
+                # Check for error response
+                if 'code' in self.res and self.res['code'] != 200:
+                    error_msg = self.res.get('msg', 'Unknown error')
+                    error_code = self.res.get('code', 'Unknown')
+                    logging.error(f"[Attempt {attempt}] Binance API Error {error_code}: {error_msg}")
+                    logging.error(f"Full response: {self.res}")
+                    
+                    # If it's a permanent error (not retryable), raise immediately
+                    if error_code in [-2021, -4120, -2010]:  # Order price invalid, order type not supported, etc.
+                        raise Exception(f"Binance API Error {error_code}: {error_msg}")
+                    
+                    if attempt == self.max_retries:
+                        raise Exception(f"Max retries reached. Last error: {error_code} - {error_msg}")
+                    time.sleep(self.retry_delay)
+                    continue
+                
+                # Check for success response
+                if 'clientAlgoId' in self.res or 'orderId' in self.res:
+                    order_id = self.res.get('orderId') or self.res.get('clientAlgoId')
+                    logging.info(f"✅ Successfully executed STOPLOSS ORDER with ID: {order_id}")
+                    return self.res
                 else:
-                    logging.warning(f"STOPLOSS order response missing orderId: {self.res}")
-                return self.res
+                    logging.warning(f"⚠️ STOPLOSS order response missing orderId/clientAlgoId: {self.res}")
+                    if attempt == self.max_retries:
+                        raise Exception(f"Unexpected response format: {self.res}")
+                    time.sleep(self.retry_delay)
+                    
             except Exception as e:
                 logging.error(f"[Attempt {attempt}] Failed to set stop loss | Error: {e}")
                 if attempt == self.max_retries:

@@ -147,8 +147,12 @@ async def main():
             try: 
                 stoploss_order = trade.set_stop_loss(symbol=symbol, side="SELL", stop_price=last_low)
                 sleep(5)
-                logging.info(stoploss_order)
-                stoploss_order_id = stoploss_order['orderId']
+                logging.info(f"Stop loss order response: {stoploss_order}")
+                # Algo Order API may return 'clientAlgoId' or 'orderId'
+                stoploss_order_id = stoploss_order.get('orderId') or stoploss_order.get('clientAlgoId')
+                if not stoploss_order_id:
+                    logging.error(f"❌ Stop loss order response missing orderId/clientAlgoId: {stoploss_order}")
+                    raise Exception(f"Stop loss order failed: {stoploss_order}")
 
             except Exception as e:
                 logging.error(f"Something went wrong executing STOPLOSS ORDER, error: {e}")
@@ -232,8 +236,12 @@ async def main():
             try: 
                 stoploss_order = trade.set_stop_loss(symbol=symbol, side="BUY", stop_price=last_high)
                 sleep(5)
-                logging.info(stoploss_order)
-                stoploss_order_id = stoploss_order['orderId']
+                logging.info(f"Stop loss order response: {stoploss_order}")
+                # Algo Order API may return 'clientAlgoId' or 'orderId'
+                stoploss_order_id = stoploss_order.get('orderId') or stoploss_order.get('clientAlgoId')
+                if not stoploss_order_id:
+                    logging.error(f"❌ Stop loss order response missing orderId/clientAlgoId: {stoploss_order}")
+                    raise Exception(f"Stop loss order failed: {stoploss_order}")
 
             except Exception as e:
                 logging.error(f"Something went wrong executing STOPLOSS ORDER, error: {e}")
