@@ -13,7 +13,7 @@ load_dotenv()
 trade = BinanceFuturesTrader()
 
 try: 
-    response = trade.set_stop_loss(symbol="SOLUSDT", side="SELL", stop_price=139.05)
+    response = trade.set_stop_loss(symbol="SOLUSDT", side="SELL", stop_price=135)
     print(response)
 except Exception as e:
     print(f"Error: {e}")
