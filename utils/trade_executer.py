@@ -29,10 +29,27 @@ class BinanceFuturesTrader:
         response = requests.post(f"{self.BASE_URL}{endpoint}", headers=headers, params=params)
         try:
             response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            logging.error(f"HTTP Error {response.status_code}: {e}")
+            logging.error(f"URL: {response.url}")
+            logging.error(f"Response body: {response.text[:500]}")  # Limit response text length
+            # Try to parse JSON error response
+            try:
+                error_json = response.json()
+                logging.error(f"Error JSON: {error_json}")
+                return error_json  # Return the error JSON so caller can handle it
+            except:
+                # If not JSON, return a dict with error info
+                return {'code': response.status_code, 'msg': f'HTTP {response.status_code} Error', 'error': response.text[:200]}
         except Exception as e:
-            logging.error(f"HTTP Error: {e}")
-            logging.error(f"Response body: {response.text}")
-        return response.json()
+            logging.error(f"Unexpected error: {e}")
+            return {'code': -1, 'msg': str(e), 'error': str(e)}
+        
+        # If successful, return JSON
+        try:
+            return response.json()
+        except:
+            return {'code': -1, 'msg': 'Invalid JSON response', 'error': response.text[:200]}
 
     def _get(self, endpoint, params=None):
         """Helper method for GET requests"""
@@ -77,42 +94,23 @@ class BinanceFuturesTrader:
 
     def set_stop_loss(self, symbol, side, stop_price):
         """
-        Set a stop loss order. 
-        Uses reduceOnly with position quantity instead of closePosition to avoid API endpoint issues.
+        Set a stop loss order using Binance Algo Order API.
+        Uses closePosition for algo orders (required endpoint for STOP_MARKET).
         """
-        # First, get the current position size
-        try:
-            positions = self.get_open_positions()
-            position = next((p for p in positions if p['symbol'] == symbol), None)
-            
-            if not position:
-                raise Exception(f"No open position found for {symbol}. Cannot set stop loss.")
-            
-            position_amt = float(position.get('positionAmt', 0))
-            if position_amt == 0:
-                raise Exception(f"Position amount is 0 for {symbol}. Cannot set stop loss.")
-            
-            quantity = abs(position_amt)
-            logging.info(f"Setting stop loss for {symbol}: position={position_amt}, quantity={quantity}")
-            
-        except Exception as e:
-            logging.error(f"Error getting position for stop loss: {e}")
-            raise
-        
         params = {
             'symbol': symbol,
             'side': side,
+            'positionSide': 'BOTH',  # Required for algo orders in one-way mode
             'type': 'STOP_MARKET',
             'stopPrice': str(stop_price),
-            'quantity': str(quantity),
-            'reduceOnly': 'true',  # Only reduce position, don't open new one
+            'closePosition': 'true',  # Close entire position
             'workingType': 'MARK_PRICE'  # Use mark price for stop trigger
         }
 
         for attempt in range(1, self.max_retries + 1):
             try:
-                # Use regular order endpoint with reduceOnly
-                self.res = self._post('/fapi/v1/order', params)
+                # Use Algo Order API endpoint (correct path: /fapi/v1/algoOrder)
+                self.res = self._post('/fapi/v1/algoOrder', params)
                 
                 # Check for error response
                 if 'code' in self.res and self.res['code'] != 200:
@@ -131,12 +129,13 @@ class BinanceFuturesTrader:
                     continue
                 
                 # Check for success response
-                if 'orderId' in self.res:
-                    order_id = self.res['orderId']
+                # Algo Order API returns 'clientAlgoId' or 'orderId'
+                if 'clientAlgoId' in self.res or 'orderId' in self.res:
+                    order_id = self.res.get('orderId') or self.res.get('clientAlgoId')
                     logging.info(f"✅ Successfully executed STOPLOSS ORDER with ID: {order_id}")
                     return self.res
                 else:
-                    logging.warning(f"⚠️ STOPLOSS order response missing orderId: {self.res}")
+                    logging.warning(f"⚠️ STOPLOSS order response missing orderId/clientAlgoId: {self.res}")
                     if attempt == self.max_retries:
                         raise Exception(f"Unexpected response format: {self.res}")
                     time.sleep(self.retry_delays)
