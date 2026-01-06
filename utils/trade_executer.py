@@ -304,5 +304,103 @@ class BinanceFuturesTrader:
         except Exception as e:
             logging.error(f"❌ Error in close_all_positions: {e}")
             return results
+
+    def close_solusdt_positions(self):
+        """
+        Close all open SOLUSDT positions on Binance Futures.
+        
+        Returns:
+            dict: Summary of closed positions with success/failure status
+        """
+        symbol = "SOLUSDT"
+        results = {
+            'success': [],
+            'failed': [],
+            'total': 0
+        }
+        
+        try:
+            # Get all open positions
+            open_positions = self.get_open_positions()
+            
+            # Filter for SOLUSDT only
+            solusdt_positions = [pos for pos in open_positions if pos['symbol'] == symbol]
+            results['total'] = len(solusdt_positions)
+            
+            if not solusdt_positions:
+                logging.info(f"No open {symbol} positions to close.")
+                return results
+            
+            logging.info(f"Found {len(solusdt_positions)} open {symbol} position(s) to close.")
+            
+            # Close each SOLUSDT position
+            for position in solusdt_positions:
+                position_amt = float(position['positionAmt'])
+                
+                # Determine side: if positionAmt is positive, we need to SELL to close
+                # If positionAmt is negative, we need to BUY to close
+                side = "SELL" if position_amt > 0 else "BUY"
+                quantity = abs(position_amt)
+                
+                try:
+                    params = {
+                        'symbol': symbol,
+                        'side': side,
+                        'type': 'MARKET',
+                        'reduceOnly': 'true',  # Only reduce position, don't open new one
+                        'quantity': str(quantity)
+                    }
+                    
+                    for attempt in range(1, self.max_retries + 1):
+                        try:
+                            response = self._post('/fapi/v1/order', params)
+                            if 'orderId' in response:
+                                logging.info(f"✅ Successfully closed {symbol} position: {position_amt} (Order ID: {response['orderId']})")
+                                results['success'].append({
+                                    'symbol': symbol,
+                                    'positionAmt': position_amt,
+                                    'orderId': response['orderId']
+                                })
+                                break
+                            else:
+                                logging.warning(f"⚠️ Close order response missing orderId for {symbol}: {response}")
+                                if attempt == self.max_retries:
+                                    results['failed'].append({
+                                        'symbol': symbol,
+                                        'positionAmt': position_amt,
+                                        'error': f"Response missing orderId: {response}"
+                                    })
+                                    break
+                        except Exception as e:
+                            logging.error(f"[Attempt {attempt}] Failed to close {symbol} position: {e}")
+                            if attempt == self.max_retries:
+                                results['failed'].append({
+                                    'symbol': symbol,
+                                    'positionAmt': position_amt,
+                                    'error': str(e)
+                                })
+                                break
+                            time.sleep(self.retry_delays)
+                    
+                    # Small delay between orders to avoid rate limiting
+                    time.sleep(0.5)
+                    
+                except Exception as e:
+                    logging.error(f"Error closing {symbol} position: {e}")
+                    results['failed'].append({
+                        'symbol': symbol,
+                        'positionAmt': position_amt,
+                        'error': str(e)
+                    })
+            
+            logging.info(f"✅ Closed {len(results['success'])}/{results['total']} {symbol} position(s) successfully.")
+            if results['failed']:
+                logging.warning(f"❌ Failed to close {len(results['failed'])} {symbol} position(s).")
+            
+            return results
+            
+        except Exception as e:
+            logging.error(f"❌ Error in close_solusdt_positions: {e}")
+            return results
                 
 
