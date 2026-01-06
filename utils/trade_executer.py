@@ -95,23 +95,67 @@ class BinanceFuturesTrader:
     def set_stop_loss(self, symbol, side, stop_price):
         """
         Set a stop loss order using Binance Algo Order API.
-        Uses closePosition for algo orders (required endpoint for STOP_MARKET).
+        For STOP_MARKET orders, we need to get position quantity and use it with reduceOnly.
         """
+        # First, get the current position size
+        try:
+            positions = self.get_open_positions()
+            position = next((p for p in positions if p['symbol'] == symbol), None)
+            
+            if not position:
+                raise Exception(f"No open position found for {symbol}. Cannot set stop loss.")
+            
+            position_amt = float(position.get('positionAmt', 0))
+            if position_amt == 0:
+                raise Exception(f"Position amount is 0 for {symbol}. Cannot set stop loss.")
+            
+            quantity = abs(position_amt)
+            logging.info(f"Setting stop loss for {symbol}: position={position_amt}, quantity={quantity}")
+            
+        except Exception as e:
+            logging.error(f"Error getting position for stop loss: {e}")
+            raise
+        
+        # Based on Binance API: STOP_MARKET orders require algo endpoint
+        # But the algotype might need to be omitted or use a different value
+        # Let's try with 'type' parameter but without 'algotype' first
         params = {
             'symbol': symbol,
             'side': side,
-            'positionSide': 'BOTH',  # Required for algo orders in one-way mode
-            'algotype': 'STOP',  # Required for algo orders - STOP for stop market orders
-            'type': 'STOP_MARKET',
+            'positionSide': 'BOTH',
+            'type': 'STOP_MARKET',  # Include type
+            'quantity': str(quantity),
             'stopPrice': str(stop_price),
-            'closePosition': 'true',  # Close entire position
-            'workingType': 'MARK_PRICE'  # Use mark price for stop trigger
+            'reduceOnly': 'true',
+            'workingType': 'MARK_PRICE'
         }
 
         for attempt in range(1, self.max_retries + 1):
             try:
-                # Use Algo Order API endpoint (correct path: /fapi/v1/algoOrder)
+                # Try algo endpoint with type but without algotype
                 self.res = self._post('/fapi/v1/algoOrder', params)
+                
+                # If we get algotype required error (-1102), add it with different values
+                if 'code' in self.res and self.res.get('code') == -1102:
+                    logging.info("algotype required. Trying with algotype='STOP_MARKET'...")
+                    params['algotype'] = 'STOP_MARKET'  # Try matching the type value
+                    self.res = self._post('/fapi/v1/algoOrder', params)
+                
+                # If we get invalid algotype error (-4500), try different values
+                if 'code' in self.res and self.res.get('code') == -4500:
+                    logging.info("Invalid algotype. Trying without 'type' parameter, only algotype...")
+                    # Remove 'type' and try with just algotype
+                    params_no_type = {
+                        'symbol': symbol,
+                        'side': side,
+                        'positionSide': 'BOTH',
+                        'algotype': 'STOP',  # Try just 'STOP' without type
+                        'quantity': str(quantity),
+                        'stopPrice': str(stop_price),
+                        'reduceOnly': 'true',
+                        'workingType': 'MARK_PRICE'
+                    }
+                    self.res = self._post('/fapi/v1/algoOrder', params_no_type)
                 
                 # Check for error response
                 if 'code' in self.res and self.res['code'] != 200:
