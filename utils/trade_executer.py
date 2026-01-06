@@ -116,46 +116,24 @@ class BinanceFuturesTrader:
             logging.error(f"Error getting position for stop loss: {e}")
             raise
         
-        # Based on Binance API: STOP_MARKET orders require algo endpoint
-        # But the algotype might need to be omitted or use a different value
-        # Let's try with 'type' parameter but without 'algotype' first
+        # Binance Algo Order API requires algotype parameter
+        # For stop market orders, use algotype='STOP' and do NOT include 'type' parameter
         params = {
             'symbol': symbol,
             'side': side,
             'positionSide': 'BOTH',
-            'type': 'STOP_MARKET',  # Include type
+            'algotype': 'STOP',  # Required: 'STOP' for stop market orders
             'quantity': str(quantity),
             'stopPrice': str(stop_price),
             'reduceOnly': 'true',
             'workingType': 'MARK_PRICE'
+            # Note: Do NOT include 'type' parameter when using algo endpoint
         }
 
         for attempt in range(1, self.max_retries + 1):
             try:
-                # Try algo endpoint with type but without algotype
+                # Use Algo Order API endpoint with algotype='STOP'
                 self.res = self._post('/fapi/v1/algoOrder', params)
-                
-                # If we get algotype required error (-1102), add it with different values
-                if 'code' in self.res and self.res.get('code') == -1102:
-                    logging.info("algotype required. Trying with algotype='STOP_MARKET'...")
-                    params['algotype'] = 'STOP_MARKET'  # Try matching the type value
-                    self.res = self._post('/fapi/v1/algoOrder', params)
-                
-                # If we get invalid algotype error (-4500), try different values
-                if 'code' in self.res and self.res.get('code') == -4500:
-                    logging.info("Invalid algotype. Trying without 'type' parameter, only algotype...")
-                    # Remove 'type' and try with just algotype
-                    params_no_type = {
-                        'symbol': symbol,
-                        'side': side,
-                        'positionSide': 'BOTH',
-                        'algotype': 'STOP',  # Try just 'STOP' without type
-                        'quantity': str(quantity),
-                        'stopPrice': str(stop_price),
-                        'reduceOnly': 'true',
-                        'workingType': 'MARK_PRICE'
-                    }
-                    self.res = self._post('/fapi/v1/algoOrder', params_no_type)
                 
                 # Check for error response
                 if 'code' in self.res and self.res['code'] != 200:
