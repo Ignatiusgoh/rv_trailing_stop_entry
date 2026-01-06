@@ -18,7 +18,7 @@ trade = BinanceFuturesTrader()
 try: 
     stoploss_order = trade.set_stop_loss(symbol="SOLUSDT", side="SELL", stop_price=120)
     print(stoploss_order)
-    stoploss_order_id = stoploss_order.get('orderId') or stoploss_order.get('clientAlgoId')
+    stoploss_order_id = stoploss_order.get('orderId') or stoploss_order.get('algoId')
     data = {
         "group_id": 0,
         "order_id": stoploss_order_id,
