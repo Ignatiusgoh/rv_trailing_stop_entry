@@ -30,8 +30,8 @@ class BinanceFuturesTrader:
         try:
             response.raise_for_status()
         except Exception as e:
-            logging.error("HTTP Error: ", e)
-            logging.error("Response body:", response.text)
+            logging.error(f"HTTP Error: {e}")
+            logging.error(f"Response body: {response.text}")
         return response.json()
 
     def _get(self, endpoint, params=None):
@@ -77,23 +77,42 @@ class BinanceFuturesTrader:
 
     def set_stop_loss(self, symbol, side, stop_price):
         """
-        Set a stop loss order using Binance Algo Order API.
-        Note: STOP_MARKET orders with closePosition must use the Algo Order endpoint.
+        Set a stop loss order. 
+        Uses reduceOnly with position quantity instead of closePosition to avoid API endpoint issues.
         """
+        # First, get the current position size
+        try:
+            positions = self.get_open_positions()
+            position = next((p for p in positions if p['symbol'] == symbol), None)
+            
+            if not position:
+                raise Exception(f"No open position found for {symbol}. Cannot set stop loss.")
+            
+            position_amt = float(position.get('positionAmt', 0))
+            if position_amt == 0:
+                raise Exception(f"Position amount is 0 for {symbol}. Cannot set stop loss.")
+            
+            quantity = abs(position_amt)
+            logging.info(f"Setting stop loss for {symbol}: position={position_amt}, quantity={quantity}")
+            
+        except Exception as e:
+            logging.error(f"Error getting position for stop loss: {e}")
+            raise
+        
         params = {
             'symbol': symbol,
             'side': side,
-            'positionSide': 'BOTH',  # Use BOTH for one-way mode
             'type': 'STOP_MARKET',
             'stopPrice': str(stop_price),
-            'closePosition': 'true',
+            'quantity': str(quantity),
+            'reduceOnly': 'true',  # Only reduce position, don't open new one
             'workingType': 'MARK_PRICE'  # Use mark price for stop trigger
         }
 
         for attempt in range(1, self.max_retries + 1):
             try:
-                # Use Algo Order API endpoint for STOP_MARKET orders
-                self.res = self._post('/fapi/v1/algo/order', params)
+                # Use regular order endpoint with reduceOnly
+                self.res = self._post('/fapi/v1/order', params)
                 
                 # Check for error response
                 if 'code' in self.res and self.res['code'] != 200:
@@ -108,26 +127,26 @@ class BinanceFuturesTrader:
                     
                     if attempt == self.max_retries:
                         raise Exception(f"Max retries reached. Last error: {error_code} - {error_msg}")
-                    time.sleep(self.retry_delay)
+                    time.sleep(self.retry_delays)
                     continue
                 
                 # Check for success response
-                if 'clientAlgoId' in self.res or 'orderId' in self.res:
-                    order_id = self.res.get('orderId') or self.res.get('clientAlgoId')
+                if 'orderId' in self.res:
+                    order_id = self.res['orderId']
                     logging.info(f"✅ Successfully executed STOPLOSS ORDER with ID: {order_id}")
                     return self.res
                 else:
-                    logging.warning(f"⚠️ STOPLOSS order response missing orderId/clientAlgoId: {self.res}")
+                    logging.warning(f"⚠️ STOPLOSS order response missing orderId: {self.res}")
                     if attempt == self.max_retries:
                         raise Exception(f"Unexpected response format: {self.res}")
-                    time.sleep(self.retry_delay)
+                    time.sleep(self.retry_delays)
                     
             except Exception as e:
                 logging.error(f"[Attempt {attempt}] Failed to set stop loss | Error: {e}")
                 if attempt == self.max_retries:
                     logging.critical("Max retries reached. Giving up.")
                     raise
-                time.sleep(self.retry_delay)
+                time.sleep(self.retry_delays)
 
     def set_take_profit_limit(self, symbol, side, stop_price, price, quantity): 
         # stop_price is when the order is triggered, price is the limit price 
