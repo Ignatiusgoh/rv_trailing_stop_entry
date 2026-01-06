@@ -101,6 +101,7 @@ class BinanceFuturesTrader:
             'symbol': symbol,
             'side': side,
             'positionSide': 'BOTH',  # Required for algo orders in one-way mode
+            'algotype': 'STOP',  # Required for algo orders - STOP for stop market orders
             'type': 'STOP_MARKET',
             'stopPrice': str(stop_price),
             'closePosition': 'true',  # Close entire position
