@@ -37,7 +37,7 @@ class TestCandle(unittest.TestCase):
         res = insertNewCandle(candle_data, MO_order_id, 0, trade_metadata, supabase_url, supabase_api_key, supbase_jwt)
         print(res)
 
-    def test_insert_sl(self):
+    def test_insert_sl(self, stoploss_order_id):
 
         candle_data2=json.dumps({
             "open": "158.10",
@@ -45,7 +45,7 @@ class TestCandle(unittest.TestCase):
             "low": "155.10",
             "close": "157.10",
         })
-        SL_order_id = 2222
+        SL_order_id = stoploss_order_id
 
         trade_metadata = json.dumps({
             'risk_amount': 10,
