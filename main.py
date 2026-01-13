@@ -5,10 +5,11 @@ import utils.indicator_cache as indicator
 import utils.binancehelpers as binance
 import utils.trade_executer as execute
 import asyncio, logging, websockets
-from utils.supabase_client import log_into_supabase, get_latest_group_id, get_latest_trades
+from utils.supabase_client import log_into_supabase, get_latest_group_id, get_latest_trades, insertNewCandle
 import os
 from datetime import datetime
 from dotenv import load_dotenv
+import json
 
 load_dotenv()
 
@@ -38,6 +39,16 @@ async def main():
     cache = indicator.CandleCache()
     historical_data = cache.fetch_historical_data(symbol=symbol, interval=interval, limit=200)
     cache = indicator.CandleCache(historical_data=historical_data)
+
+    trade_metadata = json.dumps(dict(
+        risk_amount=risk_amount,
+        fee=fee,
+        portfolio_threshold=portfolio_threshold,
+        rv_period=rv_period,
+        ema_period=ema_period,
+        rv_threshold=rv_threshold,
+        trailing_percentage=trailing_percentage,
+    ))
     
     async for candle in candle_stream(symbol, interval):   # ← stays connected
 
@@ -80,6 +91,9 @@ async def main():
         last_high = cache.candles[-1]['high']
         last_low = cache.candles[-1]['low']
 
+        candle_data = json.dumps(cache.candles[-1])
+        
+
         strategy_condition_long = (
             (rv > rv_threshold and last_close > ema and last_open < ema)
         )
@@ -112,36 +126,15 @@ async def main():
             except Exception as e:
                 logging.error(f"Something went wrong executing MARKET IN ORDER, error: {e}")
                 return e
-
-            actual_entry_price = binance.entry_price(market_in_order_id)
-            logging.info(f"Actual entry price: {actual_entry_price}")
-
-            trailing_value = (actual_entry_price - last_low) * trailing_percentage
-            logging.info(f"Trailing value: {trailing_value}")
-
-            trailing_price = actual_entry_price + trailing_value
-            logging.info(f"Stoploss will be shifted when price is at {trailing_price}")   
-
-            next_stoploss_price = last_low + trailing_value   
-            logging.info(f"Next stoploss price: {next_stoploss_price}")
-                            
-            data = {
-                "group_id": group_id,
-                "order_id": market_in_order_id,
-                "type": "MO",
-                "direction": "LONG",
-                "current_stop_loss": last_low,
-                "trailing_value": trailing_value,
-                "trailing_price": trailing_price,
-                "next_stoploss_price": next_stoploss_price
-            }
-
-            try:
-                log_into_supabase(data, supabase_url=supabase_url, api_key=supabase_api_key, jwt=supbase_jwt)
-                logging.info("MARKET IN Trade logged to Supabase")
             
+            ### Inserting MO candle data in DB ###
+            try:
+                MO_order_id = market_in['orderId']
+                insertNewCandle(candle_data, MO_order_id, group_id, trade_metadata, supabase_url, supabase_api_key, supbase_jwt)
+
             except Exception as e:
-                logging.error(f"Failed to log MARKET IN trade to Supabase: {e}")
+                logging.error(f"Something went wrong inserting new candle, error: {e}")
+                return e
         
             ###### ENTERING STOP LOSS ORDER ######
             try: 
@@ -157,25 +150,17 @@ async def main():
             except Exception as e:
                 logging.error(f"Something went wrong executing STOPLOSS ORDER, error: {e}")
                 return e
-
-            data = {
-                "group_id": group_id,
-                "order_id": stoploss_order_id,
-                "type": "SL",
-                "direction": "LONG",
-                "current_stop_loss": last_low,
-                "trailing_value": trailing_value,
-                "trailing_price": trailing_price,
-                "next_stoploss_price": next_stoploss_price
-            }
-
-            try:
-                log_into_supabase(data, supabase_url=supabase_url, api_key=supabase_api_key, jwt=supbase_jwt)
-                logging.info("STOPLOSS Trade logged to Supabase")
             
-            except Exception as e:
-                logging.error(f"Failed to log STOPLOSS trade to Supabase: {e}")
+            ### Inserting SL candle data in DB ###
+            try:
+                SL_order_id = market_in['orderId']
+                
+                insertNewCandle(candle_data, SL_order_id, group_id, trade_metadata, supabase_url, supabase_api_key, supbase_jwt)
 
+            except Exception as e:
+                logging.error(f"Something went wrong inserting new candle, error: {e}")
+                return e
+            
         
         elif strategy_condition_short:
             logging.info(f"Relative volume > {rv_threshold}, close price < {ema}, open price > {ema} ... Entering SHORT")
@@ -202,6 +187,15 @@ async def main():
                 logging.error(f"Something went wrong executing MARKET IN ORDER, error: {e}")
                 return e
 
+            ### Inserting candle data in DB ###
+            try:
+                MO_order_id = market_in['orderId']
+                insertNewCandle(candle_data, MO_order_id, group_id, trade_metadata, supabase_url, supabase_api_key, supbase_jwt)
+
+            except Exception as e:
+                logging.error(f"Something went wrong inserting new candle, error: {e}")
+                return e
+
             actual_entry_price = binance.entry_price(market_in_order_id)
             logging.info(f"Actual entry price: {actual_entry_price}")
 
@@ -213,24 +207,6 @@ async def main():
 
             next_stoploss_price = last_high - trailing_value   
             logging.info(f"Next stoploss price: {next_stoploss_price}")    
-
-            data = {
-                "group_id": group_id,
-                "order_id": market_in_order_id,
-                "type": "MO",
-                "direction": "SHORT",
-                "current_stop_loss": last_high,
-                "trailing_value": trailing_value,
-                "trailing_price": trailing_price,
-                "next_stoploss_price": next_stoploss_price
-            }
-
-            try:
-                log_into_supabase(data, supabase_url=supabase_url, api_key=supabase_api_key, jwt=supbase_jwt)
-                logging.info("MARKET IN Trade logged to Supabase")
-            
-            except Exception as e:
-                logging.error(f"Failed to log MARKET IN trade to Supabase: {e}")
         
             ###### ENTERING STOP LOSS ORDER ######
             try: 
@@ -247,25 +223,14 @@ async def main():
                 logging.error(f"Something went wrong executing STOPLOSS ORDER, error: {e}")
                 return e
 
-
-            data = {
-                "group_id": group_id,
-                "order_id": stoploss_order_id,
-                "type": "SL",
-                "direction": "SHORT",
-                "current_stop_loss": last_high,
-                "trailing_value": trailing_value,
-                "trailing_price": trailing_price,
-                "next_stoploss_price": next_stoploss_price
-            }
-
+            ### Inserting SL candle data in DB ###
             try:
-                log_into_supabase(data, supabase_url=supabase_url, api_key=supabase_api_key, jwt=supbase_jwt)
-                logging.info("STOPLOSS Trade logged to Supabase")
-            
-            except Exception as e:
-                logging.error(f"Failed to log STOPLOSS trade to Supabase: {e}")
+                SL_order_id = market_in['orderId']
+                insertNewCandle(candle_data, SL_order_id, group_id, trade_metadata, supabase_url, supabase_api_key, supbase_jwt)
 
+            except Exception as e:
+                logging.error(f"Something went wrong inserting new candle, error: {e}")
+                return e
 
         else: 
             logging.info('No entry conditions met')
