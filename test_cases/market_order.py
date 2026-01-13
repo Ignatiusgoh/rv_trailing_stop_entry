@@ -3,6 +3,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.indicator_cache import CandleCache
 from utils.trade_executer import BinanceFuturesTrader   
+from candle import TestCandle
 
 from dotenv import load_dotenv
 
@@ -12,16 +13,24 @@ load_dotenv()
 
 trade = BinanceFuturesTrader()
 
-try: 
-    set_leverage = trade.set_leverage(symbol="SOLUSDT", leverage=30)
-    print(set_leverage)
-except Exception as e:
-    print(f"Error: {e}")
+# try: 
+#     set_leverage = trade.set_leverage(symbol="SOLUSDT", leverage=30)
+#     print(set_leverage)
+# except Exception as e:
+#     print(f"Error: {e}")
 try:
     response = trade.place_market_order(symbol="SOLUSDT", side="BUY", quantity=3)
     print(response)
 except Exception as e:
     print(f"Error: {e}")
+
+test_candle = TestCandle()
+try: 
+    res = test_candle.test_insert_mo()
+    print(res)
+except Exception as e:
+    print(f"Error: {e}")
+
 
 ### TESTING CLOSE ALL POSITIONS ###
 
