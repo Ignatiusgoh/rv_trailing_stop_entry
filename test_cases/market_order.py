@@ -4,6 +4,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.indicator_cache import CandleCache
 from utils.trade_executer import BinanceFuturesTrader   
 from candle import TestCandle
+import time 
 
 from dotenv import load_dotenv
 
@@ -21,12 +22,13 @@ trade = BinanceFuturesTrader()
 try:
     response = trade.place_market_order(symbol="SOLUSDT", side="BUY", quantity=3)
     print(response)
+    market_in_order_id = response['orderId']
 except Exception as e:
     print(f"Error: {e}")
 
 test_candle = TestCandle()
 try: 
-    res = test_candle.test_insert_mo()
+    res = test_candle.test_insert_mo(market_in_order_id)
     print(res)
 except Exception as e:
     print(f"Error: {e}")

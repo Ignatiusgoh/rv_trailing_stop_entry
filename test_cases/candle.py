@@ -14,7 +14,7 @@ supbase_jwt = os.getenv("SUPABASE_JWT")
 
 class TestCandle(unittest.TestCase):
 
-    def test_insert_mo(self):
+    def test_insert_mo(self, market_in_order_id):
         candle_data=json.dumps({
             "open": "139.10",
             "high": "149.10",
@@ -22,7 +22,7 @@ class TestCandle(unittest.TestCase):
             "close": "138.10",
         })
 
-        MO_order_id = 1111
+        MO_order_id = market_in_order_id
 
         trade_metadata = json.dumps({
             'risk_amount': 10,
