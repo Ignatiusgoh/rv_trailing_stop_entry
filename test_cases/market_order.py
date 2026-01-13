@@ -6,6 +6,7 @@ from utils.trade_executer import BinanceFuturesTrader
 from utils.supabase_client import log_into_supabase
 import utils.binancehelpers as binance
 from dotenv import load_dotenv
+import time
 
 load_dotenv()
 supabase_url = os.getenv("SUPABASE_URL")
@@ -25,6 +26,7 @@ except Exception as e:
 try:
     response = trade.place_market_order(symbol="SOLUSDT", side="BUY", quantity=3)
     market_in_order_id = response['orderId']
+    time.sleep(3)
     actual_entry_price = binance.entry_price(market_in_order_id)
     print(response)
     data = {

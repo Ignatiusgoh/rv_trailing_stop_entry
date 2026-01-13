@@ -105,7 +105,7 @@ async def main():
             ###### ENTERING MARKET IN ORDER ######
             try:
                 market_in = trade.place_market_order(symbol=symbol, side = "BUY", quantity=sol_entry_size)
-                sleep(5)
+                sleep(3) ## There is a 7 seconds delay between this service logging into orders group and event-listener service logging it into supabase
                 logging.info(market_in)
                 market_in_order_id = market_in['orderId']
 
@@ -146,7 +146,7 @@ async def main():
             ###### ENTERING STOP LOSS ORDER ######
             try: 
                 stoploss_order = trade.set_stop_loss(symbol=symbol, side="SELL", stop_price=last_low)
-                sleep(5)
+                sleep(3) ## There is a 7 seconds delay between this service logging into orders group and event-listener service logging it into supabase
                 logging.info(f"Stop loss order response: {stoploss_order}")
                 # Algo Order API may return 'clientAlgoId' or 'orderId'
                 stoploss_order_id = stoploss_order.get('algoId')
@@ -194,7 +194,7 @@ async def main():
             ###### ENTERING MARKET IN ORDER ######
             try:
                 market_in = trade.place_market_order(symbol=symbol, side = "SELL", quantity=sol_entry_size)
-                sleep(5)
+                sleep(3) ## There is a 7 seconds delay between this service logging into orders group and event-listener service logging it into supabase
                 logging.info(market_in)
                 market_in_order_id = market_in['orderId']
 
@@ -235,7 +235,7 @@ async def main():
             ###### ENTERING STOP LOSS ORDER ######
             try: 
                 stoploss_order = trade.set_stop_loss(symbol=symbol, side="BUY", stop_price=last_high)
-                sleep(5)
+                sleep(3) ## There is a 7 seconds delay between this service logging into orders group and event-listener service logging it into supabase
                 logging.info(f"Stop loss order response: {stoploss_order}")
                 # Algo Order API may return 'clientAlgoId' or 'orderId'
                 stoploss_order_id = stoploss_order.get('algoId')
