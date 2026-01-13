@@ -19,7 +19,7 @@ try:
     stoploss_order = trade.set_stop_loss(symbol="SOLUSDT", side="SELL", stop_price=120)
     print(stoploss_order)
     # Algo Order API returns 'algoId' or 'clientAlgoId', not 'orderId'
-    stoploss_order_id = stoploss_order.get('algoId') or stoploss_order.get('clientAlgoId') or stoploss_order.get('orderId')
+    stoploss_order_id = stoploss_order.get('algoId') 
     print(f"Stop loss order ID: {stoploss_order_id}")
     
     data = {
