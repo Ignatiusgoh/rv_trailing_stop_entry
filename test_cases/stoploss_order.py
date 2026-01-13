@@ -22,10 +22,13 @@ try:
     # Algo Order API returns 'algoId' or 'clientAlgoId', not 'orderId'
     stoploss_order_id = stoploss_order.get('algoId') or stoploss_order.get('clientAlgoId') or stoploss_order.get('orderId')
     print(f"Stop loss order ID: {stoploss_order_id}")
+
+except Exception as e:
+    print(f"Error: {e}")
     
 test_candle = TestCandle()
 try: 
-    res = test_candle.test_insert_sl()
+    res = test_candle.test_insert_sl(stoploss_order_id)
     print(res)
 except Exception as e:
     print(f"Error: {e}")
