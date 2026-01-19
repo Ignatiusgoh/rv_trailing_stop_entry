@@ -9,6 +9,7 @@ load_dotenv()
 orders_table = 'orders'
 order_groups_table = 'order_groups'
 trades_table = 'trades'
+candles_table = 'candles'
 
 def log_into_supabase(data, supabase_url, api_key, jwt, table_name=order_groups_table):
     logging.info(f"Attempting to log the following data into supabase: {data}")
@@ -96,7 +97,33 @@ def get_latest_trades(supabase_url, api_key, jwt, table_name=trades_table):
         logging.error(f"❌ Failed to fetch latest trades ({response.status_code}): {response.text}")
         return None
     
+def insertNewCandle(candle_data, order_id, group_id, trade_metadata,supabase_url, api_key, jwt, table_name=candles_table):
+    logging.info(f"OrderID: {order_id}; GroupId: {group_id} | Inserting candle data into candles table: {candle_data}")
+    logging.info(f"Trade Metadata: {trade_metadata}")
 
+    data = {
+        "order_id": order_id,
+        "group_id": group_id,
+        "candle_data": candle_data,
+        "trade_metadata": trade_metadata
+    }
+    
+    url = f"{supabase_url}/rest/v1/{table_name}"
+    headers = {
+        "apikey": api_key,
+        "Authorization": f"Bearer {jwt}",
+        "Content-Type": "application/json",
+        "Prefer": "return=representation"
+    }
+
+    response = requests.post(url, headers=headers, json=data)
+
+    if response.status_code in (200, 201):
+        logging.info("✅ Successfully logged data:", response.json())
+        return response.json()
+    else:
+        logging.error(f"❌ Failed to log data ({response.status_code}): {response.text}")
+        return {"error": response.text, "status_code": response.status_code}
    
 if __name__ == '__main__':
     supabase_url = os.getenv("SUPABASE_URL")

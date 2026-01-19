@@ -4,6 +4,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.indicator_cache import CandleCache
 from utils.trade_executer import BinanceFuturesTrader   
 from utils.supabase_client import log_into_supabase
+from candle import TestCandle
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -21,23 +22,16 @@ try:
     # Algo Order API returns 'algoId' or 'clientAlgoId', not 'orderId'
     stoploss_order_id = stoploss_order.get('algoId') 
     print(f"Stop loss order ID: {stoploss_order_id}")
-    
-    data = {
-        "group_id": 0,
-        "order_id": stoploss_order_id,
-        "type": "SL",
-        "direction": "LONG",
-        "current_stop_loss": 120,
-        "trailing_value": 10,
-        "trailing_price": 130,
-        "next_stoploss_price": 130
-    }
-    try:
-        log_into_supabase(data, supabase_url=supabase_url, api_key=supabase_api_key, jwt=supbase_jwt)
-        print("✅ STOPLOSS Trade logged to Supabase")
 
-    except Exception as e:
-        print(f"❌ Failed to log STOPLOSS trade to Supabase: {e}")
+except Exception as e:
+    print(f"Error: {e}")
+    
+test_candle = TestCandle()
+try: 
+    res = test_candle.test_insert_sl(stoploss_order_id)
+    print(res)
+except Exception as e:
+    print(f"Error: {e}")
 
 except Exception as e:
     print(f"Error: {e}")
