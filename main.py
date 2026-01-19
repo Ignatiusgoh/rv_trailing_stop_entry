@@ -152,9 +152,8 @@ async def main():
             
             ### Inserting SL candle data in DB ###
             try:
-                SL_order_id = market_in['orderId']
                 
-                insertNewCandle(candle_data, SL_order_id, group_id, trade_metadata, supabase_url, supabase_api_key, supbase_jwt)
+                insertNewCandle(candle_data, stoploss_order_id, group_id, trade_metadata, supabase_url, supabase_api_key, supbase_jwt)
 
             except Exception as e:
                 logging.error(f"Something went wrong inserting new candle, error: {e}")
@@ -224,8 +223,7 @@ async def main():
 
             ### Inserting SL candle data in DB ###
             try:
-                SL_order_id = market_in['orderId']
-                insertNewCandle(candle_data, SL_order_id, group_id, trade_metadata, supabase_url, supabase_api_key, supbase_jwt)
+                insertNewCandle(candle_data, stoploss_order_id, group_id, trade_metadata, supabase_url, supabase_api_key, supbase_jwt)
 
             except Exception as e:
                 logging.error(f"Something went wrong inserting new candle, error: {e}")
