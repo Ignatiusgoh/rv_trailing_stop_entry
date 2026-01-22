@@ -119,7 +119,6 @@ async def main():
             ###### ENTERING MARKET IN ORDER ######
             try:
                 market_in = trade.place_market_order(symbol=symbol, side = "BUY", quantity=sol_entry_size)
-                sleep(2)
                 logging.info(market_in)
                 market_in_order_id = market_in['orderId']
 
@@ -177,7 +176,6 @@ async def main():
             ###### ENTERING MARKET IN ORDER ######
             try:
                 market_in = trade.place_market_order(symbol=symbol, side = "SELL", quantity=sol_entry_size)
-                sleep(3) ## There is a 7 seconds delay between this service logging into orders group and event-listener service logging it into supabase
                 logging.info(market_in)
                 market_in_order_id = market_in['orderId']
 
