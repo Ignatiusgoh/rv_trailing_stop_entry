@@ -207,7 +207,6 @@ async def main():
             ###### ENTERING STOP LOSS ORDER ######
             try: 
                 stoploss_order = trade.set_stop_loss(symbol=symbol, side="BUY", stop_price=last_high)
-                sleep(3) ## There is a 7 seconds delay between this service logging into orders group and event-listener service logging it into supabase
                 logging.info(f"Stop loss order response: {stoploss_order}")
                 # Algo Order API may return 'clientAlgoId' or 'orderId'
                 stoploss_order_id = stoploss_order.get('algoId')
