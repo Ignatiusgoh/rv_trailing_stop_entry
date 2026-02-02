@@ -97,7 +97,7 @@ def get_latest_trades(supabase_url, api_key, jwt, table_name=trades_table):
         logging.error(f"❌ Failed to fetch latest trades ({response.status_code}): {response.text}")
         return None
     
-def insertNewCandle(candle_data, order_id, group_id, trade_metadata,supabase_url, api_key, jwt, table_name=candles_table):
+def insertNewCandle(candle_data, order_id, group_id, trade_metadata, actual_entry_price, supabase_url, api_key, jwt, table_name=candles_table):
     logging.info(f"OrderID: {order_id}; GroupId: {group_id} | Inserting candle data into candles table: {candle_data}")
     logging.info(f"Trade Metadata: {trade_metadata}")
 
@@ -105,7 +105,8 @@ def insertNewCandle(candle_data, order_id, group_id, trade_metadata,supabase_url
         "order_id": order_id,
         "group_id": group_id,
         "candle_data": candle_data,
-        "trade_metadata": trade_metadata
+        "trade_metadata": trade_metadata,
+        "actual_entry_price": actual_entry_price
     }
     
     url = f"{supabase_url}/rest/v1/{table_name}"

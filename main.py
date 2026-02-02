@@ -126,14 +126,19 @@ async def main():
                 logging.error(f"Something went wrong executing MARKET IN ORDER, error: {e}")
                 return e
             
+            actual_entry_price = binance.entry_price(market_in_order_id)
+            logging.info(f"Actual entry price: {actual_entry_price}")
+            
             ### Inserting MO candle data in DB ###
             try:
                 MO_order_id = market_in['orderId']
-                insertNewCandle(candle_data, MO_order_id, group_id, trade_metadata, supabase_url, supabase_api_key, supbase_jwt)
+                insertNewCandle(candle_data, MO_order_id, group_id, trade_metadata, actual_entry_price, supabase_url, supabase_api_key, supbase_jwt)
 
             except Exception as e:
                 logging.error(f"Something went wrong inserting new candle, error: {e}")
                 return e
+            
+
         
             ###### ENTERING STOP LOSS ORDER ######
             try: 
@@ -182,18 +187,18 @@ async def main():
             except Exception as e:
                 logging.error(f"Something went wrong executing MARKET IN ORDER, error: {e}")
                 return e
-
+            
+            actual_entry_price = binance.entry_price(market_in_order_id)
+            logging.info(f"Actual entry price: {actual_entry_price}")
+            
             ### Inserting candle data in DB ###
             try:
                 MO_order_id = market_in['orderId']
-                insertNewCandle(candle_data, MO_order_id, group_id, trade_metadata, supabase_url, supabase_api_key, supbase_jwt)
+                insertNewCandle(candle_data, MO_order_id, group_id, trade_metadata, actual_entry_price, supabase_url, supabase_api_key, supbase_jwt)
 
             except Exception as e:
                 logging.error(f"Something went wrong inserting new candle, error: {e}")
                 return e
-
-            actual_entry_price = binance.entry_price(market_in_order_id)
-            logging.info(f"Actual entry price: {actual_entry_price}")
 
             trailing_value = (last_high - actual_entry_price) * trailing_percentage
             logging.info(f"Trailing value: {trailing_value}")
