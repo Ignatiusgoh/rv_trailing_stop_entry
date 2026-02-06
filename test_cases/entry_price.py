@@ -13,7 +13,7 @@ import time
 load_dotenv()
 
 ### TESTING GETTING ENTRY PRICE ###
-market_in_order_id = "195785622689"
+market_in_order_id = 195785622689
 trade = BinanceFuturesTrader()
 try:
     actual_entry_price = entry_price(market_in_order_id)    
