@@ -53,11 +53,11 @@ def entry_price(order_id):
     while True:
         try:
             trades = client.futures_account_trades(symbol="SOLUSDT")
-            print(trades)
+            logging.info(trades)
             matching_trades = [t for t in trades if t['orderId'] == order_id]
 
             if not matching_trades:
-                print("❌ No trades found for that order ID.")
+                logging.error("❌ No trades found for that order ID.")
             else:
                 total_qty = sum(float(t['qty']) for t in matching_trades)
                 weighted_sum = sum(float(t['price']) * float(t['qty']) for t in matching_trades)
