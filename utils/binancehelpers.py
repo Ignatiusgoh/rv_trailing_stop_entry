@@ -53,6 +53,7 @@ def entry_price(order_id):
     while True:
         try:
             trades = client.futures_account_trades(symbol="SOLUSDT")
+            print(trades)
             logging.info(trades)
             matching_trades = [t for t in trades if t['orderId'] == order_id]
 
