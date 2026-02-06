@@ -125,14 +125,23 @@ async def main():
             except Exception as e:
                 logging.error(f"Something went wrong executing MARKET IN ORDER, error: {e}")
                 return e
+
+            sleep(1)
             
-            actual_entry_price = binance.entry_price(market_in_order_id)
+            while True:
+                try:
+                    actual_entry_price = binance.entry_price(int(market_in_order_id))
+                    break
+                except Exception as e:
+                    logging.error(f"Something went wrong getting actual entry price, error: {e}")
+                    sleep(1)
+                    continue
             logging.info(f"Actual entry price: {actual_entry_price}")
             
             ### Inserting MO candle data in DB ###
             try:
                 MO_order_id = market_in['orderId']
-                insertNewCandle(candle_data, MO_order_id, group_id, trade_metadata, actual_entry_price, supabase_url, supabase_api_key, supbase_jwt)
+                insertNewCandle(candle_data, MO_order_id, group_id, trade_metadata, float(actual_entry_price), supabase_url, supabase_api_key, supbase_jwt)
 
             except Exception as e:
                 logging.error(f"Something went wrong inserting new candle, error: {e}")
@@ -157,7 +166,7 @@ async def main():
             ### Inserting SL candle data in DB ###
             try:
                 
-                insertNewCandle(candle_data, stoploss_order_id, group_id, trade_metadata, supabase_url, supabase_api_key, supbase_jwt)
+                insertNewCandle(candle_data, stoploss_order_id, group_id, trade_metadata, float(actual_entry_price), supabase_url, supabase_api_key, supbase_jwt)
 
             except Exception as e:
                 logging.error(f"Something went wrong inserting new candle, error: {e}")
@@ -187,14 +196,24 @@ async def main():
             except Exception as e:
                 logging.error(f"Something went wrong executing MARKET IN ORDER, error: {e}")
                 return e
+
+            sleep(1)
             
-            actual_entry_price = binance.entry_price(market_in_order_id)
+            while True:
+                try:
+                    actual_entry_price = binance.entry_price(int(market_in_order_id))
+                    break
+                except Exception as e:
+                    logging.error(f"Something went wrong getting actual entry price, error: {e}")
+                    sleep(1)
+                    continue
+            
             logging.info(f"Actual entry price: {actual_entry_price}")
             
             ### Inserting candle data in DB ###
             try:
                 MO_order_id = market_in['orderId']
-                insertNewCandle(candle_data, MO_order_id, group_id, trade_metadata, actual_entry_price, supabase_url, supabase_api_key, supbase_jwt)
+                insertNewCandle(candle_data, MO_order_id, group_id, trade_metadata, float(actual_entry_price), supabase_url, supabase_api_key, supbase_jwt)
 
             except Exception as e:
                 logging.error(f"Something went wrong inserting new candle, error: {e}")
@@ -225,7 +244,7 @@ async def main():
 
             ### Inserting SL candle data in DB ###
             try:
-                insertNewCandle(candle_data, stoploss_order_id, group_id, trade_metadata, supabase_url, supabase_api_key, supbase_jwt)
+                insertNewCandle(candle_data, stoploss_order_id, group_id, trade_metadata, float(actual_entry_price), supabase_url, supabase_api_key, supbase_jwt)
 
             except Exception as e:
                 logging.error(f"Something went wrong inserting new candle, error: {e}")
